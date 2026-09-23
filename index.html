@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parallel Adapter Composition &middot; Real-Time Joint Audio&ndash;Video Generation</title>
+<meta name="description" content="Block-causal attention and few-step sampling acquired in parallel against one frozen audio-video backbone, then composed by weight addition at inference.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top"><span class="brand-mark">&#8853;</span> Parallel Adapter Composition</a>
+    <div class="nav-links">
+      <a href="#method">Method</a>
+      <a href="#heldout">Results</a>
+      <a href="#longhorizon">30&#8201;s Streaming</a>
+      <a href="#geometry">Geometry</a>
+      <a href="#tables">Tables</a>
+      <a href="#cite">Cite</a>
+    </div>
+  </div>
+</nav>
+
+<header id="top" class="hero">
+  <div class="wrap">
+    <p class="venue">Under review as a conference paper at ICLR 2027</p>
+    <h1>Real-Time Joint Audio&ndash;Video Generation<br><span class="accent">by Parallel Adapter Composition</span></h1>
+    <p class="tagline">Two capabilities, learned apart, added at inference.</p>
+
+    <p class="authors">Anonymous authors &middot; Paper under double-blind review</p>
+
+    <div class="buttons">
+      <a class="btn btn-primary" href="#longhorizon">Video demos</a>
+      <a class="btn" href="#tables">Results</a>
+      <a class="btn" href="#cite">BibTeX</a>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><b>&asymp;26</b><span>fps at 480&times;832, unquantised</span></div>
+      <div class="stat"><b>4.2&#8201;s</b><span>time-to-first-frame, flat in clip length</span></div>
+      <div class="stat"><b>4</b><span>denoising steps per chunk</span></div>
+      <div class="stat"><b>30&#8201;s</b><span>continuous, 3&times; the adaptation length</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="band">
+  <div class="wrap narrow">
+    <h2 class="kicker">The claim</h2>
+    <p class="lead">
+      Making a joint audio&ndash;video diffusion transformer stream in real time needs two edits at once:
+      <b>block-causal attention</b>, so frames leave before the clip is finished, and
+      <b>few-step sampling</b>, so each chunk is cheap. The streaming literature chains them &mdash;
+      distil, then causalise, or the reverse. We show the chain is unnecessary. Each capability is
+      trained independently against <em>one frozen backbone</em> and the two updates are simply
+      <b>added at inference</b>. Because they edit different functional axes &mdash; context routing
+      versus the denoising trajectory &mdash; their weight updates write into near-orthogonal
+      directions, which we predict and then verify. No joint training, no orthogonality constraint,
+      no extra stages.
+    </p>
+  </div>
+</section>
+
+<section id="method" class="wrap">
+  <h2 class="section-title">Method</h2>
+  <p class="section-sub">
+    One frozen backbone, two independent adapters, one addition.
+  </p>
+
+  <figure class="figure wide">
+    <img src="static/figs/fig_routes.png" alt="Three routes to a few-step streaming model and what the ordering costs">
+    <figcaption>
+      <b>Three routes to a few-step streaming model, and what the order costs.</b>
+      Distilling last keeps the chain viable, at two extra stages. The reverse order, trained with a
+      plain regression loss, un-distils: the regression pulls the few-step jump field back toward
+      instantaneous velocity, so four steps no longer suffice and the residual compounds through the
+      cache.
+    </figcaption>
+  </figure>
+
+  <div class="steps">
+    <article class="step">
+      <span class="step-no">01</span>
+      <h3>Frozen backbone</h3>
+      <p>
+        MiniMax-H3 in its first-frame-conditioned audio&ndash;video configuration: 50 blocks, hidden
+        width 5376, 56 heads. Text, a first-frame condition, video and audio form one packed sequence
+        with three-dimensional rotary positions. The backbone is never updated &mdash; 62&#8201;GB frozen
+        against 262&#8201;M trainable adapter parameters.
+      </p>
+    </article>
+
+    <article class="step">
+      <span class="step-no">02</span>
+      <h3>Causal adapter &Delta;<sub>c</sub></h3>
+      <p>
+        Trained against the frozen backbone with <b>clean-context teacher forcing</b> on a doubled
+        token axis: each chunk appears twice at identical rotary positions, once clean and once noisy,
+        so a noisy chunk reads <em>only strictly earlier clean ground truth</em>. One plain
+        flow-matching regression &mdash; the only objective we ever train.
+      </p>
+    </article>
+
+    <article class="step">
+      <span class="step-no">03</span>
+      <h3>Few-step adapter &Delta;<sub>d</sub></h3>
+      <p>
+        Not trained by us. We take a public third-party 4-step distillation of the same backbone,
+        learned under bidirectional attention where distillation is already solved. Each capability is
+        acquired where it is cheapest; we never touch an ODE solver, an EMA target, or a critic.
+      </p>
+    </article>
+
+    <article class="step">
+      <span class="step-no">04</span>
+      <h3>Parallel composition</h3>
+      <p>
+        <code>W + &Delta;<sub>d</sub> + &Delta;<sub>c</sub></code>, combined by weight arithmetic at
+        inference. &Delta;<sub>d</sub> is fused offline so it adds no runtime overhead;
+        &Delta;<sub>c</sub> loads on top. Neither stage ever sees a base the other has altered, and
+        &Delta;<sub>c</sub> stays re-composable across step counts.
+      </p>
+    </article>
+  </div>
+
+  <figure class="figure">
+    <img src="static/figs/fig_mask.png" alt="Attention mask for clean-context teacher forcing on the doubled token axis">
+    <figcaption>
+      <b>The attention layout of step 02.</b> Text keys are visible to everyone; the clean bands form a
+      block-lower-triangle among themselves; each noisy band reads its own chunk plus strictly earlier
+      clean bands, and never the clean copy of itself. Only 34&ndash;36% of the doubled square is
+      permitted, which is what makes the doubling affordable under a block-sparse kernel.
+    </figcaption>
+  </figure>
+</section>
+
+<section id="heldout" class="band">
+  <div class="wrap">
+    <h2 class="section-title">Held-out clips, four systems</h2>
+    <p class="section-sub">
+      Every clip is referenced to the 50-step bidirectional teacher's own generation, so reference and
+      generation are comparable frame by frame. <b>Whole-seg</b> is the same few-step adapter run
+      bidirectionally &mdash; it isolates what causalisation costs, and removes &ldquo;four steps is too
+      few&rdquo; from the account.
+    </p>
+    <div id="heldout-gallery" class="gallery"></div>
+  </div>
+</section>
+
+<section id="longhorizon" class="wrap">
+  <h2 class="section-title">Beyond the adaptation length</h2>
+  <p class="section-sub">
+    Adapters trained on clips of roughly ten seconds, streamed to <b>30&#8201;s</b> with the history
+    capped by a sliding window. Scripts are written for 40&#8201;s so every system is still mid-sentence
+    when the video ends &mdash; falling silent is therefore a failure, not an ending.
+    <b class="warn">Turn the sound on:</b> the separation is audible before it is visible.
+  </p>
+
+  <div id="long-gallery" class="gallery"></div>
+
+  <figure class="figure wide">
+    <img src="static/figs/fig_longrun.png" alt="One clip streamed to 30 seconds across four systems, with the four soundtracks on one time axis">
+    <figcaption>
+      <b>One clip streamed to 30&#8201;s.</b> Rows are systems, columns are wall-clock seconds; below them
+      the generated soundtracks share one time axis. <span class="tag tag-bad">Chained-DA</span> stops
+      articulating well before the end while the composed routes speak throughout.
+    </figcaption>
+  </figure>
+
+  <div class="two-col">
+    <figure class="figure">
+      <img src="static/figs/fig_drift.png" alt="Within-clip image quality per chunk">
+      <figcaption>
+        <b>Within-clip quality, normalised by each clip's own first chunk.</b> At the tenth percentile
+        Chained-DA falls monotonically to 0.897 over eight chunks while the composed route stays flat
+        at &asymp;1.00 &mdash; steadier than the 50-step teacher itself, which sits at 0.963. Over all
+        211 clips, 18% of Chained-DA clips end below 0.95 of their opening quality, against 3% for ours.
+      </figcaption>
+    </figure>
+    <figure class="figure">
+      <img src="static/figs/similarity_curves.png" alt="Identity drift over the 30 second long-horizon runs">
+      <figcaption>
+        <b>Identity drift over the 30&#8201;s runs</b> (40 clips, probes every 5&#8201;s). Face identity is
+        held about equally by the composed routes and Chained-DA. Speaker identity is the honest
+        limitation: it falls furthest for our composed route, because the few-step adapter learned the
+        audio field under whole-sequence attention and the composed model must hold timbre from cached
+        history alone.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="geometry" class="band">
+  <div class="wrap narrow">
+    <h2 class="section-title">A predicted geometry, then measured</h2>
+    <p class="lead">
+      The sum is safe exactly if the two updates do not interfere. &Delta;<sub>d</sub> reparametrises
+      the denoising map along the <em>noise</em> axis; &Delta;<sub>c</sub> edits <em>context routing</em>
+      &mdash; how a token aggregates clean history through the cache. Different input factors, so
+      near-orthogonal writes are the default and interference is what would need explaining.
+    </p>
+
+    <table class="data">
+      <caption>Geometry of each causal update against each distillation update, over all 200 shared
+        (block, projection) pairs. Both interference forms vanish for orthogonal subspaces; the null
+        column pairs each block's update with another depth's.</caption>
+      <thead>
+        <tr><th>Measurement</th><th class="ours">Decoupled</th><th>Chained-DA</th><th>Chained-AD</th><th>null</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Projection</td><td class="ours">+0.0006</td><td>&minus;0.0022</td><td>&minus;0.0008</td><td>+0.0000</td></tr>
+        <tr><td>Write interference</td><td class="ours">0.0147</td><td>0.0169</td><td>0.0451</td><td>0.0117</td></tr>
+        <tr><td>Read interference</td><td class="ours">0.1356</td><td>0.1061</td><td>0.1844</td><td>0.0237</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callouts">
+      <div class="callout">
+        <b>Small edits.</b> 0.15% of the frozen projection's norm for &Delta;<sub>d</sub>, 0.28% for
+        &Delta;<sub>c</sub> &mdash; the composed point is a small perturbation of <code>W</code>, inside
+        the tangent regime where weight arithmetic is expected to behave.
+      </div>
+      <div class="callout">
+        <b>Orthogonal writes.</b> Write interference sits <em>at the null</em>. That is what lets the sum
+        keep both behaviours without a merging algorithm.
+      </div>
+      <div class="callout">
+        <b>But not disjoint inputs.</b> Read interference is 5.7&times; the null. The adapters read
+        overlapping subspaces yet write into near-orthogonal directions &mdash; the signature of two
+        edits on different functional axes.
+      </div>
+      <div class="callout">
+        <b>Geometry does not decide it.</b> Chained-DA's update is geometrically interchangeable with
+        ours, so its failure cannot be read off the parameters. What separates the routes is the
+        objective, not weight-space cancellation.
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tables" class="wrap">
+  <h2 class="section-title">Results</h2>
+
+  <h3 class="sub">Held-out test set (211 clips), against the teacher's own generation</h3>
+  <div class="table-scroll">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Teacher<span class="th-sub">50 step</span></th>
+          <th>Whole-seg<span class="th-sub">4 step</span></th>
+          <th class="ours">Decoupled<span class="th-sub">4 step, ours</span></th>
+          <th>Decoupled-50<span class="th-sub">50 step</span></th>
+          <th>Chained-DA<span class="th-sub">4 step</span></th>
+          <th>Chained-AD<span class="th-sub">4 step</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Sync-C &uarr;</td><td>8.412</td><td>8.403</td><td class="ours">7.443</td><td>7.197</td><td>6.389</td><td><b>8.021</b></td></tr>
+        <tr><td>AV-IB &uarr;</td><td>0.414</td><td>0.414</td><td class="ours">0.403</td><td><b>0.423</b></td><td>0.363</td><td>0.419</td></tr>
+        <tr><td>IQA &uarr;</td><td>0.908</td><td>0.915</td><td class="ours"><b>0.914</b></td><td>0.894</td><td>0.854</td><td>0.877</td></tr>
+        <tr><td>ASE &uarr;</td><td>5.048</td><td>5.110</td><td class="ours"><b>5.106</b></td><td>5.023</td><td>5.019</td><td>5.008</td></tr>
+        <tr><td>CLIP &uarr;</td><td>0.212</td><td>0.212</td><td class="ours"><b>0.212</b></td><td>0.210</td><td>0.212</td><td>0.212</td></tr>
+        <tr><td>CSIM-1st &uarr;</td><td>0.886</td><td>0.870</td><td class="ours">0.864</td><td>0.853</td><td><b>0.871</b></td><td>0.835</td></tr>
+        <tr><td>IQA drift</td><td>1.005</td><td>1.008</td><td class="ours">1.030</td><td>1.026</td><td><b>1.002</b></td><td>0.990</td></tr>
+        <tr><td>CSIM drift</td><td>0.981</td><td>0.981</td><td class="ours"><b>0.950</b></td><td>0.948</td><td>0.945</td><td>0.916</td></tr>
+        <tr><td>WER (En) &darr;</td><td>0.041</td><td>0.047</td><td class="ours">0.127</td><td><b>0.110</b></td><td>0.126</td><td>0.136</td></tr>
+        <tr><td>CER (Zh) &darr;</td><td>0.014</td><td>0.008</td><td class="ours"><b>0.051</b></td><td>0.055</td><td>0.061</td><td>0.061</td></tr>
+        <tr><td>Word ratio</td><td>1.002</td><td>1.003</td><td class="ours">1.017</td><td><b>0.998</b></td><td>1.023</td><td>1.039</td></tr>
+        <tr><td>Speech-end (s)</td><td>&mdash;</td><td>&minus;0.008</td><td class="ours">&minus;0.736</td><td>&minus;0.495</td><td>&minus;0.667</td><td><b>&minus;0.338</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">
+    Bold marks the best of the four autoregressive systems per row; for the drift rows and word ratio,
+    the closest to 1. Speech is transcribed with Qwen3-ASR-1.7B, errors counted in the unit the language
+    has. Speech-end deviation is signed, negative meaning early.
+  </p>
+
+  <div class="findings">
+    <div class="finding good">
+      <h4>Appearance is untouched</h4>
+      <p>Whole-seg &rarr; Decoupled varies only the attention layout: IQA 0.915 &rarr; 0.914, ASE 5.110
+      &rarr; 5.106, CLIP unchanged, FID 66.18 &rarr; 66.15 &mdash; already at the floor.</p>
+    </div>
+    <div class="finding warn">
+      <h4>What causalisation does cost</h4>
+      <p>Lip&ndash;speech coupling (&minus;0.96 Sync-C), pacing (finishing 0.74&#8201;s early) and the audio
+      distribution. All three need the model to know where it is in the script; chunkwise attention
+      leaves only the audio history to infer it from.</p>
+    </div>
+    <div class="finding bad">
+      <h4>Chaining first, regressing second</h4>
+      <p>Chained-DA is worse on over half the per-clip metrics and on all three distributional ones
+      (FID 66.15 &rarr; 70.31, FAD 3.19 &rarr; 5.02), leaving the FID floor &mdash; the un-distillation
+      the method section predicts.</p>
+    </div>
+    <div class="finding">
+      <h4>The other chain survives</h4>
+      <p>Chained-AD distils last with sampler-aware objectives and buys back the best lip sync of any
+      4-step configuration, at the price of appearance and identity (IQA 0.877 against 0.914) and two
+      extra training stages.</p>
+    </div>
+  </div>
+
+  <h3 class="sub">Public test sets, scored against real source video</h3>
+  <p class="section-sub compact">
+    100 held-out clips each. The teacher is a system under test here, not the reference.
+  </p>
+  <div class="table-scroll">
+    <table class="data compact">
+      <thead>
+        <tr><th>System</th><th>IQA &uarr;</th><th>Sync-C &uarr;</th><th>AV-IB &uarr;</th><th>DeSync &darr;</th><th>CSIM-r &uarr;</th><th>FID &darr;</th><th>FVD &darr;</th></tr>
+      </thead>
+      <tbody>
+        <tr class="group"><td colspan="8">AVSpeech (n = 100)</td></tr>
+        <tr class="gt"><td>GT (source)</td><td>0.852</td><td>6.82</td><td>0.377</td><td>0.115</td><td>0.867</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td>Teacher</td><td>0.857</td><td>8.49</td><td>0.333</td><td>0.028</td><td>0.839</td><td>32.2</td><td>128.5</td></tr>
+        <tr><td>Whole-seg</td><td>0.835</td><td>7.82</td><td>0.328</td><td>0.040</td><td>0.864</td><td>33.7</td><td>119.2</td></tr>
+        <tr class="ours-row"><td>Decoupled</td><td><b>0.866</b></td><td>7.54</td><td><b>0.334</b></td><td><b>0.007</b></td><td><b>0.791</b></td><td><b>35.2</b></td><td><b>129.0</b></td></tr>
+        <tr><td>Decoupled-50</td><td>0.836</td><td>7.13</td><td>0.324</td><td>0.028</td><td>0.761</td><td>38.9</td><td>143.6</td></tr>
+        <tr><td>Chained-AD</td><td>0.804</td><td><b>8.39</b></td><td>0.305</td><td>0.012</td><td>0.741</td><td>38.8</td><td>150.0</td></tr>
+        <tr><td>Chained-DA</td><td>0.803</td><td>6.10</td><td>0.290</td><td>0.023</td><td>0.790</td><td>40.2</td><td>131.9</td></tr>
+
+        <tr class="group"><td colspan="8">VidChatBench (n = 100)</td></tr>
+        <tr class="gt"><td>GT (source)</td><td>0.770</td><td>5.23</td><td>0.404</td><td>0.081</td><td>0.797</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td>Teacher</td><td>0.769</td><td>7.32</td><td>0.328</td><td>0.022</td><td>0.725</td><td>38.1</td><td>171.4</td></tr>
+        <tr><td>Whole-seg</td><td>0.712</td><td>6.69</td><td>0.319</td><td>0.022</td><td>0.752</td><td>40.5</td><td>178.9</td></tr>
+        <tr class="ours-row"><td>Decoupled</td><td><b>0.866</b></td><td>7.84</td><td><b>0.353</b></td><td><b>0.024</b></td><td>0.774</td><td><b>39.6</b></td><td><b>184.0</b></td></tr>
+        <tr><td>Decoupled-50</td><td>0.829</td><td>7.65</td><td>0.348</td><td>0.036</td><td>0.758</td><td>41.3</td><td>191.5</td></tr>
+        <tr><td>Chained-AD</td><td>0.742</td><td><b>7.85</b></td><td>0.336</td><td>0.031</td><td>0.698</td><td>42.4</td><td>203.0</td></tr>
+        <tr><td>Chained-DA</td><td>0.776</td><td>6.70</td><td>0.302</td><td>0.034</td><td><b>0.775</b></td><td>43.5</td><td>193.8</td></tr>
+
+        <tr class="group"><td colspan="8">HDTF (n = 100)</td></tr>
+        <tr class="gt"><td>GT (source)</td><td>0.877</td><td>8.24</td><td>0.330</td><td>&mdash;</td><td>0.937</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td>Teacher</td><td>0.874</td><td>8.94</td><td>0.297</td><td>&mdash;</td><td>0.919</td><td>13.0</td><td>63.6</td></tr>
+        <tr><td>Whole-seg</td><td>0.877</td><td>8.65</td><td>0.263</td><td>&mdash;</td><td>0.933</td><td>11.3</td><td>48.3</td></tr>
+        <tr class="ours-row"><td>Decoupled</td><td><b>0.892</b></td><td>9.04</td><td><b>0.295</b></td><td>&mdash;</td><td>0.905</td><td>14.4</td><td>61.4</td></tr>
+        <tr><td>Decoupled-50</td><td>0.880</td><td>8.69</td><td>0.270</td><td>&mdash;</td><td>0.902</td><td>15.8</td><td>59.2</td></tr>
+        <tr><td>Chained-AD</td><td>0.853</td><td><b>9.28</b></td><td>0.293</td><td>&mdash;</td><td>0.869</td><td>22.3</td><td>98.9</td></tr>
+        <tr><td>Chained-DA</td><td>0.876</td><td>8.58</td><td>0.253</td><td>&mdash;</td><td><b>0.919</b></td><td><b>14.2</b></td><td><b>49.6</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sub">Cost</h3>
+  <div class="two-col">
+    <figure class="figure">
+      <img src="static/figs/fig_cost.png" alt="Phase-resolved timing and time-to-first-frame against clip length">
+      <figcaption>
+        <b>Where streaming's extra time goes.</b> Chunk-autoregressive denoising costs 32% more than
+        whole-segment at 243 frames, but subtracting the key/value prefill puts it within 2% &mdash; the
+        prefill <em>is</em> the overhead. Time-to-first-frame is constant for chunk-AR because the first
+        window's work does not depend on total length.
+      </figcaption>
+    </figure>
+    <div class="cost-cards">
+      <div class="cost-card"><b>4.2&ndash;4.3&#8201;s</b><span>time-to-first-frame, any clip length</span></div>
+      <div class="cost-card"><b>11.2&ndash;54.3&#8201;s</b><span>the same, whole-segment &mdash; it must finish the clip</span></div>
+      <div class="cost-card"><b>&asymp;26 fps</b><span>480&times;832 on 6 accelerators, no quantisation</span></div>
+      <div class="cost-card"><b>1 stage</b><span>one plain regression; no ODE solver, EMA target or critic</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <h2 class="section-title">Limitations</h2>
+    <div class="limits">
+      <p><b>Speaker identity drifts over long sessions.</b> Face identity is held as well as any chain,
+        but voice similarity to the clip's own opening falls furthest for the composed route
+        (0.87 &rarr; 0.53). The few-step adapter learned the audio field under whole-sequence attention,
+        where a voice token sees the entire utterance; the composed model must keep timbre stable from
+        cached history alone.</p>
+      <p><b>Talking-head data only.</b> All corpora are speaker footage, so the costs we attribute to
+        causalisation &mdash; lip&ndash;speech coupling, pacing, the audio distribution &mdash; and the
+        metrics that measure them are speech-specific.</p>
+      <p><b>A single backbone.</b> Every result is on MiniMax-H3. The parallel-versus-chained conclusion
+        rests on the interaction between a regression loss and a few-step jump field, and on the
+        near-orthogonal geometry &mdash; both argued to be architecture-agnostic but untested elsewhere.</p>
+      <p><b>Teacher forcing removes the form of the train/test mismatch, not its source.</b> Training
+        conditions on ground truth, inference on the model's own output. The principled fix is a
+        self-rollout objective.</p>
+    </div>
+  </div>
+</section>
+
+<section id="cite" class="wrap narrow">
+  <h2 class="section-title">Citation</h2>
+  <div class="cite-box">
+    <button class="copy" data-target="bib">Copy</button>
+<pre id="bib">@inproceedings{anonymous2027parallel,
+  title     = {Real-Time Joint Audio--Video Generation by
+               Parallel Adapter Composition},
+  author    = {Anonymous},
+  booktitle = {Submitted to the International Conference on
+               Learning Representations (ICLR)},
+  year      = {2027},
+  note      = {Under review}
+}</pre>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap">
+    <p>Anonymous submission &middot; ICLR 2027 &middot; Source code will be released.</p>
+    <p class="muted">All videos on this page are generated. Held-out clips are referenced to the
+      teacher's own generation; the 30&#8201;s runs use prompts from public benchmarks.</p>
+  </div>
+</footer>
+
+<script src="static/js/data.js"></script>
+<script src="static/js/main.js"></script>
+</body>
+</html>
