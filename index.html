@@ -44,7 +44,7 @@
       <div class="stat"><b>&asymp;26</b><span>fps at 480&times;832, unquantised</span></div>
       <div class="stat"><b>4.2&#8201;s</b><span>time-to-first-frame, flat in clip length</span></div>
       <div class="stat"><b>4</b><span>denoising steps per chunk</span></div>
-      <div class="stat"><b>30&#8201;s</b><span>continuous, 3&times; the adaptation length</span></div>
+      <div class="stat"><b>30&#8201;s</b><span>continuous, beyond the 5&ndash;10&#8201;s training clips</span></div>
     </div>
   </div>
 </header>
@@ -88,10 +88,9 @@
       <span class="step-no">01</span>
       <h3>Frozen backbone</h3>
       <p>
-        MiniMax-H3 in its first-frame-conditioned audio&ndash;video configuration: 50 blocks, hidden
-        width 5376, 56 heads. Text, a first-frame condition, video and audio form one packed sequence
-        with three-dimensional rotary positions. The backbone is never updated &mdash; 62&#8201;GB frozen
-        against 262&#8201;M trainable adapter parameters.
+        MiniMax-H3 in its first-frame-conditioned audio&ndash;video configuration. Text, a first-frame
+        condition, video and audio form one packed sequence with three-dimensional rotary positions.
+        The backbone is never updated.
       </p>
     </article>
 
@@ -131,10 +130,10 @@
   <figure class="figure">
     <img src="static/figs/fig_mask.png" alt="Attention mask for clean-context teacher forcing on the doubled token axis">
     <figcaption>
-      <b>The attention layout of step 02.</b> Text keys are visible to everyone; the clean bands form a
-      block-lower-triangle among themselves; each noisy band reads its own chunk plus strictly earlier
-      clean bands, and never the clean copy of itself. Only 34&ndash;36% of the doubled square is
-      permitted, which is what makes the doubling affordable under a block-sparse kernel.
+      <b>The attention layout of step 02</b>, on a three-chunk packed sequence. Clean tokens attend
+      same-or-earlier clean tokens; a noisy chunk attends its own noisy tokens and strictly earlier clean
+      history, never its clean copy. Text is visible in both directions; the first-frame condition is
+      chunk &minus;1, visible as a key to every content row.
     </figcaption>
   </figure>
 </section>
@@ -155,7 +154,7 @@
 <section id="longhorizon" class="wrap">
   <h2 class="section-title">Beyond the adaptation length</h2>
   <p class="section-sub">
-    Adapters trained on clips of roughly ten seconds, streamed to <b>30&#8201;s</b> with the history
+    A causal adapter trained on 5&ndash;10&#8201;s clips, streamed to <b>30&#8201;s</b> with the history
     capped by a sliding window. Scripts are written for 40&#8201;s so every system is still mid-sentence
     when the video ends &mdash; falling silent is therefore a failure, not an ending.
     <b class="warn">Turn the sound on:</b> the separation is audible before it is visible.
@@ -172,24 +171,42 @@
     </figcaption>
   </figure>
 
+  <h3 class="sub">Closing 5&#8201;s against opening 5&#8201;s, 40 clips</h3>
+  <div class="table-scroll">
+    <table class="data">
+      <thead>
+        <tr><th>System</th><th>Sync-C &uarr;</th><th>Identity &uarr;</th><th>CLIP &uarr;</th><th>IQA &uarr;</th><th>Voice &uarr;</th><th>RMS</th></tr>
+      </thead>
+      <tbody>
+        <tr class="ours-row"><td>Decoupled</td><td>5.69 (&minus;29.6%)</td><td><b>0.710 (&minus;18.3%)</b></td><td>0.844 (&minus;9.7%)</td><td><b>0.871 (+2.6%)</b></td><td>0.521 (&minus;41.0%)</td><td><b>0.086 (&minus;10.6%)</b></td></tr>
+        <tr><td>Decoupled-50</td><td>6.23 (&minus;19.1%)</td><td>0.687 (&minus;18.9%)</td><td><b>0.856 (&minus;8.2%)</b></td><td>0.848 (+3.0%)</td><td><b>0.682 (&minus;22.3%)</b></td><td>0.109 (&minus;16.6%)</td></tr>
+        <tr><td>Chained-AD</td><td><b>7.82 (&minus;12.8%)</b></td><td>0.484 (&minus;41.8%)</td><td>0.737 (&minus;19.7%)</td><td>0.526 (&minus;35.4%)</td><td>0.608 (&minus;31.9%)</td><td>0.185 (+49.0%)</td></tr>
+        <tr><td>Chained-DA</td><td>3.75 (&minus;43.7%)</td><td>0.683 (&minus;21.4%)</td><td>0.841 (&minus;10.5%)</td><td>0.656 (&minus;16.2%)</td><td>0.603 (&minus;32.3%)</td><td>0.047 (&minus;37.9%)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">
+    Each cell is the score on the final 5&#8201;s and, in parentheses, its change from the opening
+    5&#8201;s. Bold marks the best closing window; for RMS, an absolute level, it marks the smallest
+    relative change. Decoupled closes best on identity and image quality; Chained-AD keeps the best lip
+    sync but loses over a third of identity and image quality; Chained-DA has largely fallen silent.
+  </p>
+
   <div class="two-col">
     <figure class="figure">
-      <img src="static/figs/fig_drift.png" alt="Within-clip image quality per chunk">
+      <img src="static/figs/consistency.png" alt="First-frame consistency as a function of generation time">
       <figcaption>
-        <b>Within-clip quality, normalised by each clip's own first chunk.</b> At the tenth percentile
-        Chained-DA falls monotonically to 0.897 over eight chunks while the composed route stays flat
-        at &asymp;1.00 &mdash; steadier than the 50-step teacher itself, which sits at 0.963. Over all
-        211 clips, 18% of Chained-DA clips end below 0.95 of their opening quality, against 3% for ours.
+        <b>Long-horizon consistency as a function of generation time.</b> FaceNet similarity and CLIP
+        image similarity to the first frame of the same video; means over 40 clips with 95% confidence
+        intervals, terminating at each method's actual duration.
       </figcaption>
     </figure>
     <figure class="figure">
       <img src="static/figs/similarity_curves.png" alt="Identity drift over the 30 second long-horizon runs">
       <figcaption>
         <b>Identity drift over the 30&#8201;s runs</b> (40 clips, probes every 5&#8201;s). Face identity is
-        held about equally by the composed routes and Chained-DA. Speaker identity is the honest
-        limitation: it falls furthest for our composed route, because the few-step adapter learned the
-        audio field under whole-sequence attention and the composed model must hold timbre from cached
-        history alone.
+        retained equally well by Decoupled, Decoupled-50 and Chained-DA, and worst by Chained-AD.
+        Speaker identity falls furthest for Decoupled, the limitation noted below.
       </figcaption>
     </figure>
   </div>
@@ -206,7 +223,7 @@
     </p>
 
     <table class="data">
-      <caption>Geometry of each causal update against each distillation update, over all 200 shared
+      <caption>Geometry of each causal update against each distillation update, over all shared
         (block, projection) pairs. Both interference forms vanish for orthogonal subspaces; the null
         column pairs each block's update with another depth's.</caption>
       <thead>
@@ -226,8 +243,8 @@
         the tangent regime where weight arithmetic is expected to behave.
       </div>
       <div class="callout">
-        <b>Orthogonal writes.</b> Write interference sits <em>at the null</em>. That is what lets the sum
-        keep both behaviours without a merging algorithm.
+        <b>Near-orthogonal writes.</b> Write interference is only 26% above the null, against 472% for
+        read interference. That is what lets the sum keep both behaviours without a merging algorithm.
       </div>
       <div class="callout">
         <b>But not disjoint inputs.</b> Read interference is 5.7&times; the null. The adapters read
@@ -235,8 +252,8 @@
         edits on different functional axes.
       </div>
       <div class="callout">
-        <b>Geometry does not decide it.</b> Chained-DA's update is geometrically interchangeable with
-        ours, so its failure cannot be read off the parameters. What separates the routes is the
+        <b>Geometry does not decide it.</b> Chained-DA's update is geometrically almost
+        indistinguishable from ours, so its failure cannot be read off the parameters. What separates the routes is the
         objective, not weight-space cancellation.
       </div>
     </div>
@@ -271,34 +288,32 @@
         <tr><td>CSIM drift</td><td>0.981</td><td>0.981</td><td class="ours"><b>0.950</b></td><td>0.948</td><td>0.945</td><td>0.916</td></tr>
         <tr><td>WER (En) &darr;</td><td>0.041</td><td>0.047</td><td class="ours">0.127</td><td><b>0.110</b></td><td>0.126</td><td>0.136</td></tr>
         <tr><td>CER (Zh) &darr;</td><td>0.014</td><td>0.008</td><td class="ours"><b>0.051</b></td><td>0.055</td><td>0.061</td><td>0.061</td></tr>
-        <tr><td>Word ratio</td><td>1.002</td><td>1.003</td><td class="ours">1.017</td><td><b>0.998</b></td><td>1.023</td><td>1.039</td></tr>
-        <tr><td>Speech-end (s)</td><td>&mdash;</td><td>&minus;0.008</td><td class="ours">&minus;0.736</td><td>&minus;0.495</td><td>&minus;0.667</td><td><b>&minus;0.338</b></td></tr>
       </tbody>
     </table>
   </div>
   <p class="note">
-    Bold marks the best of the four autoregressive systems per row; for the drift rows and word ratio,
-    the closest to 1. Speech is transcribed with Qwen3-ASR-1.7B, errors counted in the unit the language
-    has. Speech-end deviation is signed, negative meaning early.
+    Bold marks the best of the four autoregressive systems per row; for the drift rows, the closest
+    to 1. Speech is transcribed with Qwen3-ASR-1.7B: WER for the English clips, CER for the Chinese
+    ones.
   </p>
 
   <div class="findings">
     <div class="finding good">
       <h4>Appearance is untouched</h4>
       <p>Whole-seg &rarr; Decoupled varies only the attention layout: IQA 0.915 &rarr; 0.914, ASE 5.110
-      &rarr; 5.106, CLIP unchanged, FID 66.18 &rarr; 66.15 &mdash; already at the floor.</p>
+      &rarr; 5.106, CLIP unchanged, FID 66.18 &rarr; 66.15 &mdash; below the teacher's floor of 67.10.</p>
     </div>
     <div class="finding warn">
       <h4>What causalisation does cost</h4>
-      <p>Lip&ndash;speech coupling (&minus;0.96 Sync-C), pacing (finishing 0.74&#8201;s early) and the audio
-      distribution. All three need the model to know where it is in the script; chunkwise attention
-      leaves only the audio history to infer it from.</p>
+      <p>Speech: intelligibility (WER 0.047 &rarr; 0.127), lip&ndash;speech coupling (Sync-C 8.403
+      &rarr; 7.443) and the audio distribution. All three need the model to know where it is in the
+      script; chunkwise attention leaves only the audio history to infer it from.</p>
     </div>
     <div class="finding bad">
       <h4>Chaining first, regressing second</h4>
-      <p>Chained-DA is worse on over half the per-clip metrics and on all three distributional ones
-      (FID 66.15 &rarr; 70.31, FAD 3.19 &rarr; 5.02), leaving the FID floor &mdash; the un-distillation
-      the method section predicts.</p>
+      <p>Chained-DA falls behind on appearance, synchronisation and speech, and its FID rises above the
+      teacher's floor (70.31 against 67.10) while Decoupled stays below it (66.15) &mdash; the
+      un-distillation the method section predicts.</p>
     </div>
     <div class="finding">
       <h4>The other chain survives</h4>
@@ -349,21 +364,15 @@
   </div>
 
   <h3 class="sub">Cost</h3>
-  <div class="two-col">
-    <figure class="figure">
-      <img src="static/figs/fig_cost.png" alt="Phase-resolved timing and time-to-first-frame against clip length">
-      <figcaption>
-        <b>Where streaming's extra time goes.</b> Chunk-autoregressive denoising costs 32% more than
-        whole-segment at 243 frames, but subtracting the key/value prefill puts it within 2% &mdash; the
-        prefill <em>is</em> the overhead. Time-to-first-frame is constant for chunk-AR because the first
-        window's work does not depend on total length.
-      </figcaption>
-    </figure>
+  <p class="section-sub compact">
+    The extra wall-clock of streaming is the key/value prefill, not the denoising steps.
+  </p>
+  <div>
     <div class="cost-cards">
       <div class="cost-card"><b>4.2&ndash;4.3&#8201;s</b><span>time-to-first-frame, any clip length</span></div>
       <div class="cost-card"><b>11.2&ndash;54.3&#8201;s</b><span>the same, whole-segment &mdash; it must finish the clip</span></div>
-      <div class="cost-card"><b>&asymp;26 fps</b><span>480&times;832 on 6 accelerators, no quantisation</span></div>
-      <div class="cost-card"><b>1 stage</b><span>one plain regression; no ODE solver, EMA target or critic</span></div>
+      <div class="cost-card"><b>&asymp;26 fps</b><span>480&times;832 on six GPUs, no quantisation</span></div>
+      <div class="cost-card"><b>1 objective</b><span>one plain regression; no ODE solver, EMA target or critic</span></div>
     </div>
   </div>
 </section>
@@ -372,20 +381,18 @@
   <div class="wrap narrow">
     <h2 class="section-title">Limitations</h2>
     <div class="limits">
-      <p><b>Speaker identity drifts over long sessions.</b> Face identity is held as well as any chain,
-        but voice similarity to the clip's own opening falls furthest for the composed route
-        (0.87 &rarr; 0.53). The few-step adapter learned the audio field under whole-sequence attention,
-        where a voice token sees the entire utterance; the composed model must keep timbre stable from
-        cached history alone.</p>
-      <p><b>Talking-head data only.</b> All corpora are speaker footage, so the costs we attribute to
-        causalisation &mdash; lip&ndash;speech coupling, pacing, the audio distribution &mdash; and the
-        metrics that measure them are speech-specific.</p>
-      <p><b>A single backbone.</b> Every result is on MiniMax-H3. The parallel-versus-chained conclusion
-        rests on the interaction between a regression loss and a few-step jump field, and on the
-        near-orthogonal geometry &mdash; both argued to be architecture-agnostic but untested elsewhere.</p>
-      <p><b>Teacher forcing removes the form of the train/test mismatch, not its source.</b> Training
-        conditions on ground truth, inference on the model's own output. The principled fix is a
-        self-rollout objective.</p>
+      <p><b>Talking-head data only.</b> Every corpus we train or evaluate on is talking-head footage, so
+        the costs we attribute to causalisation &mdash; lip&ndash;speech coupling, the audio distribution
+        &mdash; and the metrics that measure them are specific to this domain.</p>
+      <p><b>Speaker identity drifts over long sessions.</b> The composed route holds face identity as
+        well as any chain, but voice similarity to the clip's opening falls furthest for Decoupled
+        (0.521 in the final 5&#8201;s, &minus;41.0%). The few-step adapter learned the audio field under
+        whole-sequence attention; the composed model must keep timbre from cached history alone, and the
+        causal adapter never sees its own rollouts. A self-rollout objective is natural future work.</p>
+      <p><b>A single backbone.</b> Every result is on MiniMax-H3, so whether parallel composition
+        transfers to other joint audio&ndash;video backbones remains untested. We also do not compare
+        against OmniForcing: it is trained on LTX-2, and a cross-backbone table would confound the
+        generator with the recipe.</p>
     </div>
   </div>
 </section>

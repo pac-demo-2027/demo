@@ -218,8 +218,7 @@ function init(data) {
         ? `<b>Script:</b> &ldquo;${c.text}&rdquo;<br>`
         : '') +
         `<b>Drift</b> is the last window's image quality over the first window's. A value near 1 means
-         the clip ends as sharp as it started; Chained-DA is the route whose quality decays along the
-         clip, which a clip mean cannot show.`,
+         the clip ends as sharp as it started.`,
     });
 }
 
