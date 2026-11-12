@@ -16,8 +16,10 @@
   <div class="nav-inner">
     <a class="brand" href="#top"><span class="brand-mark">&#8853;</span> Parallel Adapter Composition</a>
     <div class="nav-links">
+      <a href="#live">Live Demo</a>
       <a href="#method">Method</a>
       <a href="#heldout">Results</a>
+      <a href="#vabench">VABench</a>
       <a href="#longhorizon">30&#8201;s Streaming</a>
       <a href="#geometry">Geometry</a>
       <a href="#tables">Tables</a>
@@ -35,19 +37,54 @@
     <p class="authors">Anonymous authors &middot; Paper under double-blind review</p>
 
     <div class="buttons">
-      <a class="btn btn-primary" href="#longhorizon">Video demos</a>
+      <a class="btn btn-primary" href="#live">Interactive live demo</a>
+      <a class="btn" href="#longhorizon">Offline clips</a>
       <a class="btn" href="#tables">Results</a>
       <a class="btn" href="#cite">BibTeX</a>
     </div>
 
     <div class="stat-row">
-      <div class="stat"><b>&asymp;26</b><span>fps at 480&times;832, unquantised</span></div>
-      <div class="stat"><b>4.2&#8201;s</b><span>time-to-first-frame, flat in clip length</span></div>
+      <div class="stat"><b>&asymp;59.5</b><span>fps decoded emit (DiT &asymp;66.8, W8A8)</span></div>
+      <div class="stat"><b>0.89&#8201;s</b><span>first packet, 20-run mean</span></div>
       <div class="stat"><b>4</b><span>denoising steps per chunk</span></div>
       <div class="stat"><b>30&#8201;s</b><span>continuous, beyond the 5&ndash;10&#8201;s training clips</span></div>
     </div>
   </div>
 </header>
+
+<section id="live" class="live-band">
+  <div class="wrap">
+    <p class="kicker">Interactive system</p>
+    <h2 class="section-title">Interactive real-time demo</h2>
+    <p class="section-sub">
+      This is a <b>screen recording of our interactive live system</b>, not an offline
+      generated clip. A person on the phone talks to the character; the laptop page
+      streams joint audio&ndash;video in real time from the composed 4-step adapters
+      (block-causal + few-step), with half-duplex turn-taking.
+      <b class="warn">Turn the sound on.</b>
+    </p>
+
+    <figure class="live-player">
+      <div class="live-frame">
+        <span class="live-badge">Interactive real-time demo</span>
+        <video
+          controls
+          playsinline
+          preload="metadata"
+          poster="static/videos/live-demo/poster.jpg"
+          src="static/videos/live-demo/interactive-realtime-demo.mp4">
+          Your browser does not play this video.
+        </video>
+      </div>
+      <figcaption>
+        <b>Live conversation, not a pre-rendered clip.</b>
+        Left: the streaming character on the web page (joint audio&ndash;video, 4 denoising
+        steps per chunk). Right: the user on the phone. The clip is about 2&nbsp;min of
+        uninterrupted back-and-forth.
+      </figcaption>
+    </figure>
+  </div>
+</section>
 
 <section class="band">
   <div class="wrap narrow">
@@ -149,6 +186,20 @@
     </p>
     <div id="heldout-gallery" class="gallery"></div>
   </div>
+</section>
+
+<section id="vabench" class="wrap">
+  <h2 class="section-title">VABench I2AV samples</h2>
+  <p class="section-sub">
+    The same 4-step composed stack on <b>VABench I2AV</b>: 521 first-frame-conditioned
+    clips across 14 scene types (animals, music, weather, events), almost no talking
+    faces. Six high-scoring examples below.
+    <span class="tag tag-ours">Decoupled</span> is ours (4-step streaming);
+    <b>NAR-4</b> is the same few-step adapter run on the whole clip.
+    <b class="warn">Turn the sound on</b> &mdash; the benchmark is about the soundtrack
+    as much as the picture.
+  </p>
+  <div id="vabench-gallery" class="gallery"></div>
 </section>
 
 <section id="longhorizon" class="wrap">
@@ -365,16 +416,26 @@
 
   <h3 class="sub">Cost</h3>
   <p class="section-sub compact">
-    The extra wall-clock of streaming is the key/value prefill, not the denoising steps.
+    The video decoder is a non-causal LightVAE: five visual latents decode to 17 frames, so every
+    latency below is <b>per block</b>, not per frame. Training and inference use ten latents per
+    chunk &mdash; one DiT block is about 34 frames, 1.42&#8201;s at 24&#8201;fps. Text encoder, DiT
+    (W8A8 fused kernels) and VAE decoder sit on separate devices: a finished DiT block is handed to
+    the decoder while DiT starts the next.
   </p>
-  <div>
-    <div class="cost-cards">
-      <div class="cost-card"><b>4.2&ndash;4.3&#8201;s</b><span>time-to-first-frame, any clip length</span></div>
-      <div class="cost-card"><b>11.2&ndash;54.3&#8201;s</b><span>the same, whole-segment &mdash; it must finish the clip</span></div>
-      <div class="cost-card"><b>&asymp;26 fps</b><span>480&times;832 on six GPUs, no quantisation</span></div>
-      <div class="cost-card"><b>1 objective</b><span>one plain regression; no ODE solver, EMA target or critic</span></div>
-    </div>
+  <div class="cost-cards cost-cards-wide">
+    <div class="cost-card"><b>0.886&#8201;&plusmn;&#8201;0.006&#8201;s</b><span>first packet over 20 runs: text 0.103&#8201;s, DiT 0.390&#8201;s, decode 0.305&#8201;s, pack 0.024&#8201;s</span></div>
+    <div class="cost-card"><b>0.571&#8201;s</b><span>median gap between 34-frame blocks in the steady state &mdash; shorter than the 1.42&#8201;s of footage they cover</span></div>
+    <div class="cost-card"><b>&asymp;59.5 fps</b><span>decoded emit; DiT renders at &asymp;66.8 fps (W8A8). Both beat 24&#8201;fps playback</span></div>
+    <div class="cost-card"><b>1 stage</b><span>one plain regression; no ODE solver, EMA target or critic</span></div>
   </div>
+  <p class="note">
+    First-packet split (20 runs): text encode 0.103&#8201;s (uncached, one shot), DiT
+    0.390&#8201;&plusmn;&#8201;0.001&#8201;s, decode 0.305&#8201;&plusmn;&#8201;0.006&#8201;s (video 0.244, audio 0.061),
+    pack 0.024&#8201;&plusmn;&#8201;0.001&#8201;s; the leftover 0.064&#8201;&plusmn;&#8201;0.004&#8201;s is setup before
+    denoise and handing the block to the decoder. KV-cache extraction rides that first block into the
+    decoder, off the first-packet path. The interactive demo on this page also sees about
+    0.5&ndash;1&#8201;s of network delay.
+  </p>
 </section>
 
 <section class="band">
@@ -416,8 +477,10 @@
 <footer class="footer">
   <div class="wrap">
     <p>Anonymous submission &middot; ICLR 2027 &middot; Source code will be released.</p>
-    <p class="muted">All videos on this page are generated. Held-out clips are referenced to the
-      teacher's own generation; the 30&#8201;s runs use prompts from public benchmarks.</p>
+    <p class="muted">The live-demo video is a screen recording of the interactive system.
+      The remaining clips are generated offline. Held-out clips are referenced to the
+      teacher's own generation; VABench samples are I2AV generations on the official
+      521-clip set; the 30&#8201;s runs use prompts from public benchmarks.</p>
   </div>
 </footer>
 

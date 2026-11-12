@@ -20,6 +20,11 @@ const HELD_ARMS = [
   { key: 'chained_da', name: 'Chained-DA', sub: '4 step, streaming',      tag: null },
 ];
 
+const VABENCH_ARMS = [
+  { key: 'decoupled', name: 'Decoupled', sub: '4 step, streaming',      tag: 'ours', ours: true },
+  { key: 'nar4',      name: 'NAR-4',     sub: '4 step, whole-segment',  tag: null },
+];
+
 const RHO_KEY = {
   decoupled: 'Decoupled', decoupled50: 'Decoupled-50',
   chained_ad: 'Chained-AD', chained_da: 'Chained-DA',
@@ -200,6 +205,23 @@ function init(data) {
         of the three on 27 of 40 clips; paired signed-rank tests separate the chained route from both
         composed ones at <i>p</i>&thinsp;&lt;&thinsp;10<sup>&minus;4</sup>.`,
     });
+
+  const vabenchRoot = document.getElementById('vabench-gallery');
+  if (vabenchRoot && data.vabench) {
+    new Gallery(
+      vabenchRoot,
+      data.vabench, VABENCH_ARMS,
+      {
+        defaultAudio: 'decoupled',
+        label: c => c.name,
+        foot: () => 'VABench I2AV',
+        meta: c => `${c.frames} frames \u00b7 ${c.duration.toFixed(1)} s \u00b7 ${c.w}\u00d7${c.h}`,
+        note: c => `<b>Prompt:</b> &ldquo;${c.text}&rdquo;<br>
+          First-frame to joint audio&ndash;video on the official VABench I2AV set.
+          Decoupled is the composed streaming route; NAR-4 drops the causal adapter and
+          denoises the whole clip at once.`,
+      });
+  }
 
   new Gallery(
     document.getElementById('heldout-gallery'),

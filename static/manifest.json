@@ -278,5 +278,97 @@
       "w": 512,
       "h": 296
     }
+  ],
+  "vabench": [
+    {
+      "name": "Animals · dog",
+      "stem": "large_dog_barking_in_misty_mountain",
+      "category": "3_Animals",
+      "text": "Large dog in mountain wilderness, head raised, mouth open barking, misty woods, open spacious background",
+      "arms": {
+        "decoupled": "static/videos/vabench/large_dog_barking_in_misty_mountain__ar4.mp4",
+        "nar4": "static/videos/vabench/large_dog_barking_in_misty_mountain__nar4.mp4"
+      },
+      "poster": "static/posters/vb_large_dog_barking_in_misty_mountain.jpg",
+      "duration": 5.18,
+      "w": 640,
+      "h": 370,
+      "frames": 124
+    },
+    {
+      "name": "Music · guitar",
+      "stem": "woman_playing_acoustic_guitar_indoors",
+      "category": "7_Music",
+      "text": "A woman sitting on a comfortable sofa, holding an acoustic guitar and strumming its strings, in a warm indoor environment.",
+      "arms": {
+        "decoupled": "static/videos/vabench/woman_playing_acoustic_guitar_indoors__ar4.mp4",
+        "nar4": "static/videos/vabench/woman_playing_acoustic_guitar_indoors__nar4.mp4"
+      },
+      "poster": "static/posters/vb_woman_playing_acoustic_guitar_indoors.jpg",
+      "duration": 5.18,
+      "w": 640,
+      "h": 370,
+      "frames": 124
+    },
+    {
+      "name": "Nature · volcano",
+      "stem": "volcano_eruption_night_sounds_2",
+      "category": "2_Natural_Environment",
+      "text": "Under the night sky, a volcano erupts with lava flowing down its slopes, surrounded by mountains and trees with rustling leaves.",
+      "arms": {
+        "decoupled": "static/videos/vabench/volcano_eruption_night_sounds_2__ar4.mp4",
+        "nar4": "static/videos/vabench/volcano_eruption_night_sounds_2__nar4.mp4"
+      },
+      "poster": "static/posters/vb_volcano_eruption_night_sounds_2.jpg",
+      "duration": 5.18,
+      "w": 640,
+      "h": 370,
+      "frames": 124
+    },
+    {
+      "name": "Atmosphere · fireworks",
+      "stem": "fireworks_echoing_in_night_sky_2",
+      "category": "2_Indoor_Environment_and_Urban_Atmosphere",
+      "text": "Magnificent fireworks bursting in the night sky over an urban area.",
+      "arms": {
+        "decoupled": "static/videos/vabench/fireworks_echoing_in_night_sky_2__ar4.mp4",
+        "nar4": "static/videos/vabench/fireworks_echoing_in_night_sky_2__nar4.mp4"
+      },
+      "poster": "static/posters/vb_fireworks_echoing_in_night_sky_2.jpg",
+      "duration": 5.18,
+      "w": 640,
+      "h": 370,
+      "frames": 124
+    },
+    {
+      "name": "Rhythm · helicopter",
+      "stem": "helicopter_blades_wind_trees_sky",
+      "category": "4__Rhythm_and_Cyclical_Synchronization",
+      "text": "A black helicopter flies against a background of blue sky and green trees.",
+      "arms": {
+        "decoupled": "static/videos/vabench/helicopter_blades_wind_trees_sky__ar4.mp4",
+        "nar4": "static/videos/vabench/helicopter_blades_wind_trees_sky__nar4.mp4"
+      },
+      "poster": "static/posters/vb_helicopter_blades_wind_trees_sky.jpg",
+      "duration": 5.18,
+      "w": 640,
+      "h": 370,
+      "frames": 124
+    },
+    {
+      "name": "World · airshow",
+      "stem": "aerial_flight_performance_on_beach_2",
+      "category": "11_Physical_Knowledge_and_World_Knowledge",
+      "text": "A crowd on a beach watching an airplane performing aerial maneuvers in the sky above.",
+      "arms": {
+        "decoupled": "static/videos/vabench/aerial_flight_performance_on_beach_2__ar4.mp4",
+        "nar4": "static/videos/vabench/aerial_flight_performance_on_beach_2__nar4.mp4"
+      },
+      "poster": "static/posters/vb_aerial_flight_performance_on_beach_2.jpg",
+      "duration": 5.18,
+      "w": 640,
+      "h": 370,
+      "frames": 124
+    }
   ]
 }
