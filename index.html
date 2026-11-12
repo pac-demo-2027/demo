@@ -45,7 +45,7 @@
 
     <div class="stat-row">
       <div class="stat"><b>&asymp;59.5</b><span>fps decoded emit (DiT &asymp;66.8, W8A8)</span></div>
-      <div class="stat"><b>0.89&#8201;s</b><span>first packet, 20-run mean</span></div>
+      <div class="stat"><b>0.886&#8201;s</b><span>first packet, 20-run mean</span></div>
       <div class="stat"><b>4</b><span>denoising steps per chunk</span></div>
       <div class="stat"><b>30&#8201;s</b><span>continuous, beyond the 5&ndash;10&#8201;s training clips</span></div>
     </div>
@@ -200,6 +200,47 @@
     as much as the picture.
   </p>
   <div id="vabench-gallery" class="gallery"></div>
+
+  <h3 class="sub">VABench I2AV, 521 clips, 4-step</h3>
+  <p class="section-sub compact">
+    Autoregressive and non-autoregressive arms use the same 4-step setting as the paper.
+    Sora2, Veo3 and Wan2.5 are copied from Table&nbsp;2 of the VABench paper on the same
+    521 prompts, under each system&rsquo;s own defaults &mdash; not re-run by us; that table
+    does not report Artistry. Lower DeSync is better.
+  </p>
+  <div class="table-scroll">
+    <table class="data compact">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th class="ours">AR-4<span class="th-sub">Decoupled, ours</span></th>
+          <th>NAR-4<span class="th-sub">whole-segment</span></th>
+          <th>Sora2</th>
+          <th>Veo3</th>
+          <th>Wan2.5</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Audio Aes</td><td class="ours">3.472</td><td>3.467</td><td>2.974</td><td>3.574</td><td>3.455</td></tr>
+        <tr><td>T&ndash;V Align</td><td class="ours">0.2233</td><td>0.2254</td><td>0.2188</td><td>0.2334</td><td>0.2374</td></tr>
+        <tr><td>T&ndash;A Align</td><td class="ours">0.3277</td><td>0.3569</td><td>0.4045</td><td>0.4130</td><td>0.2865</td></tr>
+        <tr><td>A&ndash;V Align</td><td class="ours">0.2177</td><td>0.235</td><td>0.2623</td><td>0.3215</td><td>0.2112</td></tr>
+        <tr><td>DeSync &darr;</td><td class="ours">0.6693</td><td>0.5992</td><td>0.9171</td><td>0.6136</td><td>0.3539</td></tr>
+        <tr><td>Alignment</td><td class="ours">4.919</td><td>4.921</td><td>4.885</td><td>4.906</td><td>4.812</td></tr>
+        <tr><td>Expressiveness</td><td class="ours">4.488</td><td>4.522</td><td>4.390</td><td>4.631</td><td>4.495</td></tr>
+        <tr><td>Visual Realism</td><td class="ours">4.9</td><td>4.923</td><td>4.964</td><td>4.921</td><td>4.766</td></tr>
+        <tr><td>Audio Realism</td><td class="ours">4.43</td><td>4.441</td><td>4.597</td><td>4.660</td><td>4.395</td></tr>
+        <tr><td>Audio QA</td><td class="ours">0.7075</td><td>0.7392</td><td>0.8287</td><td>0.8584</td><td>0.8084</td></tr>
+        <tr><td>Visual QA</td><td class="ours">0.7338</td><td>0.7493</td><td>0.7611</td><td>0.7982</td><td>0.7889</td></tr>
+        <tr><td>Artistry</td><td class="ours">3.985</td><td>3.981</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">
+    The autoregressive model is worse on text&ndash;audio alignment and on DeSync; the other
+    absolute gaps are small. These 521 clips are mostly non-speech, whereas the training set
+    is entirely digital humans. Sora2, Veo3 and Wan2.5 are a reference for magnitude only.
+  </p>
 </section>
 
 <section id="longhorizon" class="wrap">
@@ -255,8 +296,8 @@
     <figure class="figure">
       <img src="static/figs/similarity_curves.png" alt="Identity drift over the 30 second long-horizon runs">
       <figcaption>
-        <b>Identity drift over the 30&#8201;s runs</b> (40 clips, probes every 5&#8201;s). Face identity is
-        retained equally well by Decoupled, Decoupled-50 and Chained-DA, and worst by Chained-AD.
+        <b>Identity drift over the 30&#8201;s runs</b> (40 clips, probes every 5&#8201;s).         Face identity is best for Decoupled (0.710, &minus;18.3% from the opening; Chained-AD 0.484,
+        Chained-DA 0.683) and worst for Chained-AD.
         Speaker identity falls furthest for Decoupled, the limitation noted below.
       </figcaption>
     </figure>
@@ -275,13 +316,15 @@
 
     <table class="data">
       <caption>Geometry of each causal update against each distillation update, over all shared
-        (block, projection) pairs. Both interference forms vanish for orthogonal subspaces; the null
+        (block, projection) pairs. After mapping the few-step LoRA into the fused qkv layout used at
+        inference, Decoupled projection is &minus;0.0006 versus a depth-shuffled null of 0.0000
+        (<i>p</i>&nbsp;=&nbsp;0.98). Both interference forms vanish for orthogonal subspaces; the null
         column pairs each block's update with another depth's.</caption>
       <thead>
         <tr><th>Measurement</th><th class="ours">Decoupled</th><th>Chained-DA</th><th>Chained-AD</th><th>null</th></tr>
       </thead>
       <tbody>
-        <tr><td>Projection</td><td class="ours">+0.0006</td><td>&minus;0.0022</td><td>&minus;0.0008</td><td>+0.0000</td></tr>
+        <tr><td>Projection</td><td class="ours">&minus;0.0006</td><td>&minus;0.0022</td><td>&minus;0.0008</td><td>+0.0000</td></tr>
         <tr><td>Write interference</td><td class="ours">0.0147</td><td>0.0169</td><td>0.0451</td><td>0.0117</td></tr>
         <tr><td>Read interference</td><td class="ours">0.1356</td><td>0.1061</td><td>0.1844</td><td>0.0237</td></tr>
       </tbody>
@@ -442,9 +485,11 @@
   <div class="wrap narrow">
     <h2 class="section-title">Limitations</h2>
     <div class="limits">
-      <p><b>Talking-head data only.</b> Every corpus we train or evaluate on is talking-head footage, so
-        the costs we attribute to causalisation &mdash; lip&ndash;speech coupling, the audio distribution
-        &mdash; and the metrics that measure them are specific to this domain.</p>
+      <p><b>Training is talking-head; VABench is the non-speech check.</b> Adaptation data are
+        digital humans, and the main-text tables stay on that domain. During discussion we evaluated
+        all 521 VABench I2AV clips (mostly non-speech, all 14 categories) at the same 4-step setting;
+        the autoregressive adapter stays close to the non-autoregressive one, except on text&ndash;audio
+        alignment and DeSync. Lip&ndash;speech metrics in the main tables remain speech-specific.</p>
       <p><b>Speaker identity drifts over long sessions.</b> The composed route holds face identity as
         well as any chain, but voice similarity to the clip's opening falls furthest for Decoupled
         (0.521 in the final 5&#8201;s, &minus;41.0%). The few-step adapter learned the audio field under
